@@ -1,66 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using ConsoleApp1;
-
-public class InMemoryRepository<T> : IRepository<T> where T : Entity
-{
-    private readonly List<T> _entities = new List<T>();
-    private int _nextId = 1;
-
-    public T GetById(int id)
-    {
-        return _entities.FirstOrDefault(e => e.Id == id);
-    }
-
-    public IList<T> FindAll()
-    {
-        return _entities.ToList();
-    }
-
-    public void Add(T entity)
-    {
-        if (entity.Id == 0)
-        {
-            entity.Id = _nextId++;
-        }
-        _entities.Add(entity);
-    }
-
-    public void Delete(T entity)
-    {
-        _entities.RemoveAll(e => e.Id == entity.Id);
-    }
-
-    public void Update(T entity)
-    {
-        var existingEntity = GetById(entity.Id);
-        if (existingEntity != null)
-        {
-            _entities.Remove(existingEntity);
-            _entities.Add(entity);
-        }
-    }
-}
+using ConsoleApp1.Entites;
 
 public class Program
 {
     public static void Main()
     {
         var userRepository = new InMemoryRepository<User>();
-        var wantedBookRepository = new InMemoryRepository<UsersBook>();
-        var givenOutBookRepository = new InMemoryRepository<UsersBook>();
-        var availableBookRepository = new InMemoryRepository<Book>();
+        var userBookRepository = new InMemoryRepository<UserBook>();
+        var wantedUserBookRepository = new InMemoryRepository<WantedUserBook>();
+        var booksRepository = new InMemoryRepository<Book>();
 
         var bookRelationService = new UserBookRelation(
             userRepository,
-            wantedBookRepository,
-            givenOutBookRepository,
-            availableBookRepository
+            userBookRepository,
+            wantedUserBookRepository
         );
 
         var user1 = new User { Name = "Vasily Pupkin", Email = "vasya@example.com" };
         userRepository.Add(user1);
+
+        var user2 = new User { Name = "Vasily Pupkin", Email = "vasya@example.com" };
+        userRepository.Add(user2);
+
+        var user3 = new User { Name = "Vasily Pupkin", Email = "vasya@example.com" };
+        userRepository.Add(user3);
 
         var book1 = new Book
         {
@@ -68,7 +35,7 @@ public class Program
             Author = "Robert C. Martin",
             Isbn = "9780132350884"
         };
-        availableBookRepository.Add(book1);
+        booksRepository.Add(book1);
 
         var book2 = new Book
         {
@@ -76,19 +43,31 @@ public class Program
             Author = "Erich Gamma et al.",
             Isbn = "9780201633610"
         };
-        availableBookRepository.Add(book2);
+        booksRepository.Add(book2);
 
-        bool success = bookRelationService.AddBookToWanted(user1.Id, book1.Id, UsersBook.State.Good);
+        var userBook1 = new UserBook(book1.Id, user1.Id, State.Good);
+        userBookRepository.Add(userBook1);
+
+        var userBook2 = new UserBook(book1.Id, user3.Id, State.Bad);
+        userBookRepository.Add(userBook2);
+
+        var userBook3 = new UserBook(book2.Id, user1.Id, State.Good);
+        userBookRepository.Add(userBook3);
+
+
+        bool success = bookRelationService.AddBookToWanted(user2.Id, userBook1.Id);
 
         if (success)
         {
             Console.WriteLine($"Book '{book1.Title}' has been added to {user1.Name}'s wanted list.");
-            
+
             Console.WriteLine("\nWanted Books:");
-            var wantedBooks = wantedBookRepository.FindAll();
-            foreach (var book in wantedBooks)
+            var wantedBooks = wantedUserBookRepository.FindAll();
+            foreach (var wantedBook in wantedBooks)
             {
-                Console.WriteLine($"- {book.Title} by {book.Author} (State: {book.BookState})");
+                var userBook = userBookRepository.GetById(wantedBook.BookId);
+                var book = booksRepository.GetById(userBook.BookId);
+                Console.WriteLine($"- {book.Title} by {book.Author} (State: {userBook.BookState})");
             }
         }
         else
@@ -96,17 +75,20 @@ public class Program
             Console.WriteLine("Failed to add book to wanted list.");
         }
 
-        success = bookRelationService.AddBookToWanted(user1.Id, book2.Id, UsersBook.State.Moderate);
+        success = bookRelationService.AddBookToWanted(user1.Id, userBook2.Id);
 
         if (success)
         {
             Console.WriteLine($"Book '{book2.Title}' has been added to {user1.Name}'s wanted list.");
 
             Console.WriteLine("\nWanted Books:");
-            var wantedBooks = wantedBookRepository.FindAll();
-            foreach (var book in wantedBooks)
+            var wantedBooks = wantedUserBookRepository.FindAll();
+            foreach (var wantedBook in wantedBooks)
             {
-                Console.WriteLine($"- {book.Title} by {book.Author} (State: {book.BookState})");
+                var userBook = userBookRepository.GetById(wantedBook.BookId);
+                var book = booksRepository.GetById(userBook.BookId);
+
+                Console.WriteLine($"- {book.Title} by {book.Author} (State: {userBook.BookState})");
             }
         }
         else
